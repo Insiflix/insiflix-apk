@@ -1,0 +1,28 @@
+# Build outputs and local caches
+.gradle/
+.kotlin/
+**/build/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# Machine-specific Android SDK and signing configuration
+local.properties
+keystore.properties
+key.properties
+*.jks
+*.keystore
+.env
+.env.*
+!.env.example
+
+# Android Studio local settings; share the project name and VCS mapping
+.idea/*
+!.idea/.name
+!.idea/vcs.xml
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db

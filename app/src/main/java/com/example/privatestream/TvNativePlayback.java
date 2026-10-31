@@ -1,5 +1,7 @@
 package com.example.privatestream;
 
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
 import android.view.KeyEvent;
@@ -55,6 +57,7 @@ public class TvNativePlayback {
     private ExoPlayer player;
     private long positionMs;
     private boolean bridgeInstalled;
+    private boolean openingYouTube;
 
     public TvNativePlayback(ComponentActivity activity, WebView webView, FrameLayout container,
             Uri homeUri, ActiveChangedListener onActiveChanged) {
@@ -64,12 +67,17 @@ public class TvNativePlayback {
         this.homeUri = homeUri;
         this.onActiveChanged = onActiveChanged;
         origin = homeUri.getScheme() + "://" + homeUri.getAuthority();
-        try (InputStream input = activity.getAssets().open("tv-native-playback.js");
+        script = readScript(activity, "tv-native-playback.js") + "\n"
+                + readScript(activity, "tv-youtube-playback.js");
+    }
+
+    private static String readScript(ComponentActivity activity, String name) {
+        try (InputStream input = activity.getAssets().open(name);
                 ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[8192];
             int count;
             while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
-            script = new String(output.toByteArray(), StandardCharsets.UTF_8);
+            return new String(output.toByteArray(), StandardCharsets.UTF_8);
         } catch (IOException error) {
             throw new IllegalStateException("Cannot load TV playback bridge", error);
         }
@@ -90,6 +98,10 @@ public class TvNativePlayback {
                     try {
                         parsed = new JSONObject(data);
                     } catch (JSONException error) {
+                        return;
+                    }
+                    if ("youtube".equals(parsed.optString("type"))) {
+                        openYouTube(parsed.optString("videoId"));
                         return;
                     }
                     if (!isAllowedMedia(Uri.parse(parsed.optString("url")))
@@ -129,6 +141,31 @@ public class TvNativePlayback {
                 && effectivePort(uri) == 443
                 && (isHomeOrigin(uri) || ("api.insiflix.com".equals(uri.getHost())
                     && uri.getPath() != null && uri.getPath().startsWith("/videos/watch/")));
+    }
+
+    private void openYouTube(String videoId) {
+        // Only accept an ID, never an arbitrary intent URL or target package from JavaScript.
+        if (!videoId.matches("[A-Za-z0-9_-]{11}") || openingYouTube || isActive()
+                || !activity.getLifecycle().getCurrentState().isAtLeast(
+                    androidx.lifecycle.Lifecycle.State.RESUMED)) return;
+        Uri video = new Uri.Builder().scheme("https").authority("www.youtube.com")
+                .path("/watch").appendQueryParameter("v", videoId).build();
+        String[] packages = {
+            "com.amazon.firetv.youtube", "com.google.android.youtube.tv", "com.google.android.youtube"
+        };
+        openingYouTube = true;
+        for (String packageName : packages) {
+            try {
+                // Keep Insiflix in the back stack; YouTube retains its own signed-in account.
+                activity.startActivity(new Intent(Intent.ACTION_VIEW, video).setPackage(packageName));
+                return;
+            } catch (ActivityNotFoundException | SecurityException unavailable) {
+                // Try the official YouTube app for the next supported device family.
+            }
+        }
+        openingYouTube = false;
+        Toast.makeText(activity, "Install the YouTube app to play this video, then choose Open in YouTube.",
+                Toast.LENGTH_LONG).show();
     }
 
     private void open(JSONObject data) {
@@ -228,6 +265,7 @@ public class TvNativePlayback {
     }
 
     public void onResume() {
+        openingYouTube = false;
         if (isActive() && player == null) initializePlayer(false);
     }
 

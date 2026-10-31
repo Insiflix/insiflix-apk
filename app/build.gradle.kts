@@ -15,8 +15,8 @@ android {
         applicationId = "com.insiflix.apkcontainer"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.1.5"
+        versionCode = 6
+        versionName = "0.1.6"
         // Change the URL to your actual HTTPS streaming frontend.
         buildConfigField("String", "STREAM_URL", "\"https://insiflix.com/\"")
     }

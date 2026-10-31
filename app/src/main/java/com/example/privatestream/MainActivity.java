@@ -70,7 +70,8 @@ public class MainActivity extends ComponentActivity {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
-        settings.setMediaPlaybackRequiresUserGesture(true);
+        // Site controls and YouTube's iframe API start media programmatically.
+        settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
@@ -90,6 +91,17 @@ public class MainActivity extends ComponentActivity {
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
+                // YouTube iframe navigations must stay in Chromium's embedded player.
+                // This exception never permits replacing the top-level streaming site.
+                String host = uri.getHost();
+                boolean youtubeFrame = !request.isForMainFrame()
+                        && "https".equals(uri.getScheme())
+                        && uri.getUserInfo() == null
+                        && (uri.getPort() == -1 || uri.getPort() == 443)
+                        && ("www.youtube.com".equals(host) || "youtube.com".equals(host)
+                            || "www.youtube-nocookie.com".equals(host)
+                            || "youtube-nocookie.com".equals(host));
+                if (youtubeFrame) return false;
                 boolean streaming = java.util.Objects.equals(uri.getHost(), homeUri.getHost())
                         && uri.getPort() == homeUri.getPort();
                 boolean keycloak = "lutsch-eier.de".equals(uri.getHost())

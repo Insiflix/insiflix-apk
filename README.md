@@ -42,8 +42,12 @@ releases the decoder when the activity stops.
 The existing watch-token URL is retained. Requests include the website's Origin,
 Referer and user agent; browser cookies and bearer headers are not copied.
 Embedded media subtitles and exposed HTTPS VTT/SRT tracks on the trusted hosts
-are supported. YouTube embeds, DRM, blob/MSE sources and live lounge synchronization
-are not handled by this native path. Position restoration applies when returning
+are supported. On TV watch pages, YouTube embeds open the matching video in the
+installed official YouTube app, using that app's signed-in account. Back returns
+to Insiflix; an Open in YouTube button allows replay without an automatic relaunch.
+If YouTube is missing, the app asks the user to install it. Playback position and
+playlist progression are managed by YouTube and are not synchronized back to Insiflix.
+DRM, blob/MSE sources and live lounge synchronization are not handled by Media3. Position restoration applies when returning
 to the same loaded page, not after Android kills the process.
 
 Build with `./gradlew :app:assembleDebug`. Run the handoff tests with

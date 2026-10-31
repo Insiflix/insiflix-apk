@@ -65,6 +65,8 @@ public class MainActivity extends ComponentActivity {
             container.setFitsSystemWindows(true);
         }
         webView = new WebView(this);
+        // Keep the initial blank page black until the website paints its content.
+        webView.setBackgroundColor(Color.BLACK);
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);

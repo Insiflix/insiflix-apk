@@ -1,5 +1,9 @@
 # insiflix-apk
 
+The Android app is implemented in Java 17. Gradle configuration uses Kotlin DSL
+(`.gradle.kts`); the app does not apply the Kotlin Android plugin. The JavaScript
+TV bridge and TypeScript Vue integration example remain in their original languages.
+
 WebView app for phones, with native Media3 playback on Android-based TV devices including Fire TV. This does **not** enable video playback on projected Android Auto.
 Google currently lists games, not video, as supported parked apps on regular Android Auto.
 

@@ -5,6 +5,7 @@
         android:label="Insiflix"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
+        android:banner="@drawable/insiflix_tv_banner"
         android:usesCleartextTraffic="false"
         android:theme="@style/AppTheme">
         <activity

@@ -2,6 +2,7 @@
     'use strict';
     if (window !== window.top || window.NativeTVPlayback || !window.NativePlayback) return;
     var active = null;
+    var webOnly = new WeakMap();
     var sequence = 0;
     var originalPlay = HTMLMediaElement.prototype.play;
     function streamUrl(video) {
@@ -20,7 +21,7 @@
         if (!(video instanceof HTMLVideoElement)) return false;
         if (active) return active.video === video;
         var url = streamUrl(video);
-        if (!url) return false;
+        if (!url || webOnly.get(video) === url) return false;
         var position = Number.isFinite(video.currentTime) ? video.currentTime : 0;
         var id = String(Date.now()) + '-' + String(++sequence);
         var sources = Array.from(video.querySelectorAll('source[src]')).map(function (source) {
@@ -34,7 +35,7 @@
                 return { url: track.src, language: track.srclang, label: track.label, selected: track.default };
             })
         };
-        active = { id: id, video: video, src: video.getAttribute('src'), sources: sources };
+        active = { id: id, video: video, url: url, src: video.getAttribute('src'), sources: sources };
         video.pause();
         // Release WebView's decoder before the native player acquires the video hardware.
         video.autoplay = false;
@@ -50,10 +51,12 @@
     };
     document.addEventListener('play', function (event) { open(event.target); }, true);
     window.NativeTVPlayback = {
-        complete: function (id, position, ended) {
+        complete: function (id, position, ended, useWebPlayer) {
             if (!active || active.id !== id) return;
             var state = active;
             var video = state.video;
+            // Remember only this element/source, so another video can still use Media3.
+            if (useWebPlayer) webOnly.set(video, state.url);
             // Keep the session guarded while restoring the source and position.
             if (state.src !== null) video.setAttribute('src', state.src);
             state.sources.forEach(function (source) { source.element.setAttribute('src', source.src); });
@@ -63,7 +66,12 @@
                     video.currentTime = Number.isFinite(video.duration) ?
                         Math.min(position, video.duration) : position;
                 }
-                video.pause();
+                if (useWebPlayer) {
+                    var playing = originalPlay.call(video);
+                    if (playing && playing.catch) playing.catch(function () { video.pause(); });
+                } else {
+                    video.pause();
+                }
             }, { once: true });
             video.load();
             active = null;

@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.webkit.WebView;
 import android.widget.FrameLayout;
@@ -15,6 +16,8 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
+import androidx.media3.common.Format;
+import androidx.media3.common.Tracks;
 import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
@@ -183,7 +186,7 @@ public class TvNativePlayback {
         playerView = view;
         container.addView(view, new FrameLayout.LayoutParams(-1, -1));
         onActiveChanged.onActiveChanged(true);
-        // Keep the WebView laid out behind the opaque video surface for restoration.
+        // Keep the WebView laid out for restoration or unsupported-codec fallback.
         initializePlayer(true);
         view.showController();
         view.requestFocus();
@@ -205,10 +208,38 @@ public class TvNativePlayback {
         nativePlayer.setAudioAttributes(AudioAttributes.DEFAULT, true);
         nativePlayer.setHandleAudioBecomingNoisy(true);
         nativePlayer.addListener(new Player.Listener() {
+            @Override public void onTracksChanged(Tracks tracks) {
+                if (tracks.containsType(C.TRACK_TYPE_VIDEO)
+                        && !tracks.isTypeSupported(C.TRACK_TYPE_VIDEO)) {
+                    // No native video decoder: do not leave the user with audio only.
+                    webView.post(() -> {
+                        if (player != nativePlayer || request != data) return;
+                        Toast.makeText(activity, "Videoformat wird im Webplayer abgespielt.",
+                                Toast.LENGTH_LONG).show();
+                        close(false, true, true);
+                    });
+                }
+                if (!BuildConfig.DEBUG) return;
+                for (Tracks.Group group : tracks.getGroups()) {
+                    for (int index = 0; index < group.length; index++) {
+                        Format format = group.getTrackFormat(index);
+                        // Log codec metadata only; stream URLs and watch tokens stay private.
+                        Log.i("TvPlayback", "track type=" + group.getType()
+                                + " selected=" + group.isTrackSelected(index)
+                                + " support=" + group.getTrackSupport(index)
+                                + " mime=" + format.sampleMimeType + " codecs=" + format.codecs
+                                + " size=" + format.width + "x" + format.height);
+                    }
+                }
+            }
+            @Override public void onRenderedFirstFrame() {
+                if (BuildConfig.DEBUG) Log.i("TvPlayback", "First video frame rendered");
+            }
             @Override public void onPlaybackStateChanged(int playbackState) {
                 if (playbackState == Player.STATE_ENDED) close(true, true);
             }
             @Override public void onPlayerError(PlaybackException error) {
+                if (BuildConfig.DEBUG) Log.i("TvPlayback", "Playback error: " + error.getErrorCodeName());
                 Toast.makeText(activity, "Video could not be played (" + error.getErrorCodeName()
                         + "). Press Back to return.", Toast.LENGTH_LONG).show();
                 if (playerView != null) playerView.showController();
@@ -283,6 +314,10 @@ public class TvNativePlayback {
     }
 
     public void close(boolean ended, boolean restorePage) {
+        close(ended, restorePage, false);
+    }
+
+    private void close(boolean ended, boolean restorePage, boolean useWebPlayer) {
         JSONObject data = request;
         if (data == null) return;
         releasePlayer();
@@ -296,7 +331,7 @@ public class TvNativePlayback {
         if (restorePage && isHomeOrigin(currentPage())) {
             String id = JSONObject.quote(data.optString("id"));
             webView.evaluateJavascript("window.NativeTVPlayback && window.NativeTVPlayback.complete("
-                    + id + ", " + positionMs / 1000.0 + ", " + ended + ");", null);
+                    + id + ", " + positionMs / 1000.0 + ", " + ended + ", " + useWebPlayer + ");", null);
         }
         webView.requestFocus();
     }

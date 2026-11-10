@@ -70,6 +70,26 @@ test('return restores the source and position without restarting web playback', 
     assert.equal(messages.length, 2, 'explicit play after returning opens native again');
 });
 
+test('unsupported native video resumes in web player without a handoff loop', async () => {
+    const { Video, window, messages } = setup();
+    const video = new Video();
+    const url = video.src;
+    await video.play();
+    window.NativeTVPlayback.complete('stale-id', 10, false, true);
+    assert.equal(video.src, '', 'stale replies cannot restore or bypass playback');
+    window.NativeTVPlayback.complete(messages[0].id, 53, false, true);
+    assert.equal(video.src, url);
+    video.listeners.loadedmetadata();
+    assert.equal(video.currentTime, 53);
+    assert.equal(video.webPlayCount, 1, 'fallback resumes browser playback');
+    await video.play();
+    assert.equal(video.webPlayCount, 2);
+    assert.equal(messages.length, 1, 'same unsupported source stays in the browser');
+    video.setAttribute('src', url.replace('example?', 'another?'));
+    await video.play();
+    assert.equal(messages.length, 2, 'a new source can use native playback again');
+});
+
 test('foreign, insecure, credentialed and nonstandard-port URLs stay out of native playback', async () => {
     for (const url of [
         'https://untrusted.example/video.mp4',

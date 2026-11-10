@@ -104,7 +104,7 @@ public class MainActivity extends ComponentActivity {
                 if (youtubeFrame) return false;
                 boolean streaming = java.util.Objects.equals(uri.getHost(), homeUri.getHost())
                         && uri.getPort() == homeUri.getPort();
-                boolean keycloak = "lutsch-eier.de".equals(uri.getHost())
+                boolean keycloak = "insidentity.click".equals(uri.getHost())
                         && (uri.getPort() == -1 || uri.getPort() == 443);
                 return !("https".equals(uri.getScheme()) && (streaming || keycloak));
             }
